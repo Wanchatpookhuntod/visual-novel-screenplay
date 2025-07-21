@@ -130,14 +130,33 @@ python main.py
 - **PySide6** (GUI framework)
 - **ReportLab** (PDF generation)
 
-### ติดตั้ง dependencies
+### ติดตั้งแบบอัตโนมัติ (แนะนำ) ⭐
+
+#### Windows
+```batch
+install.bat
+```
+
+#### macOS/Linux
 ```bash
+chmod +x install.sh
+./install.sh
+```
+
+### ติดตั้งด้วยตนเอง
+```bash
+# ติดตั้งจาก requirements.txt
 pip install -r requirements.txt
 ```
 
 หรือติดตั้งแยก:
 ```bash
 pip install PySide6 reportlab pillow
+```
+
+### ตรวจสอบการติดตั้ง
+```bash
+python -c "import PySide6, reportlab, PIL; print('✓ All dependencies ready!')"
 ```
 
 ## 🎮 วิธีใช้งานแบบละเอียด
