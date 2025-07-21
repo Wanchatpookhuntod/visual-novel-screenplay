@@ -8,34 +8,23 @@ import json
 import csv
 import os
 from PySide6.QtWidgets import QFileDialog, QMessageBox
+from font_manager import font_manager
 
-# PDF generation imports
+# PDF generation using ReportLab only
 try:
-    from weasyprint import HTML, CSS
+    from reportlab.lib.pagesizes import A4
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.pdfbase import pdfutils
+    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.pdfbase import pdfmetrics
     import unicodedata
     PDF_AVAILABLE = True
-    WEASYPRINT_AVAILABLE = True
-except (ImportError, OSError) as e:
-    # WeasyPrint not available or missing dependencies
+    print("PDF generation ready using ReportLab")
+except ImportError as reportlab_error:
     PDF_AVAILABLE = False
-    WEASYPRINT_AVAILABLE = False
-    print(f"WeasyPrint not available: {e}")
-    
-    # Fallback to ReportLab
-    try:
-        from reportlab.lib.pagesizes import A4
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.units import inch
-        from reportlab.pdfbase import pdfutils
-        from reportlab.pdfbase.ttfonts import TTFont
-        from reportlab.pdfbase import pdfmetrics
-        import unicodedata
-        PDF_AVAILABLE = True
-        print("Using ReportLab as fallback for PDF generation")
-    except ImportError as reportlab_error:
-        PDF_AVAILABLE = False
-        print(f"ReportLab also not available: {reportlab_error}")
+    print(f"ReportLab not available: {reportlab_error}")
 
 
 class ExportManager:
@@ -399,10 +388,10 @@ class ExportManager:
                 QMessageBox.critical(self.main_window, "Export Error", f"Failed to export CSV:\n{str(e)}")
 
     def export_as_pdf(self):
-        """Export connected nodes data as PDF screenplay using WeasyPrint or ReportLab fallback"""
+        """Export connected nodes data as PDF screenplay using ReportLab"""
         if not PDF_AVAILABLE:
             QMessageBox.warning(self.main_window, "PDF Export Not Available", 
-                              "PDF export requires 'weasyprint' or 'reportlab' library.\n\nInstall with: pip install weasyprint\nor: pip install reportlab")
+                              "PDF export requires the 'reportlab' library.\n\nInstall with: pip install reportlab")
             return
             
         # Update all connection data first
@@ -419,115 +408,209 @@ class ExportManager:
                 if not file_name.lower().endswith('.pdf'):
                     file_name += '.pdf'
                 
-                # Try WeasyPrint first, fallback to ReportLab
-                if WEASYPRINT_AVAILABLE:
-                    self._export_pdf_weasyprint(file_name)
-                else:
-                    self._export_pdf_reportlab(file_name)
+                # Use ReportLab for PDF generation
+                self._export_pdf_reportlab(file_name)
                     
             except Exception as e:
                 QMessageBox.critical(self.main_window, "Export Error", f"Failed to export PDF:\n{str(e)}")
                 import traceback
                 traceback.print_exc()
     
-    def _export_pdf_weasyprint(self, file_name):
-        """Export PDF using WeasyPrint - fallback to ReportLab for now"""
-        # For now, just use ReportLab fallback since WeasyPrint has dependency issues
-        self._export_pdf_reportlab(file_name)
-    
     def _export_pdf_reportlab(self, file_name):
-        """Export PDF using ReportLab fallback"""
+        """Export PDF using ReportLab"""
         sequence = self.get_connected_nodes_sequence()
         
-        # Try to register Thai fonts
+        # Register Thai fonts using font manager
         try:
-            sarabun_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'Sarabun')
-            sarabun_regular = os.path.join(sarabun_path, 'Sarabun-Regular.ttf')
+            fonts_registered = font_manager.register_thai_fonts()
+            font_family = font_manager.get_primary_thai_font()
             
-            if os.path.exists(sarabun_regular):
-                pdfmetrics.registerFont(TTFont('Sarabun', sarabun_regular))
-                font_family = 'Sarabun'
-                print("Thai fonts (Sarabun) registered successfully")
+            if fonts_registered > 0:
+                print(f"Successfully registered {fonts_registered} Thai font variants")
             else:
-                font_family = 'Helvetica'  # Fallback
-                print("Sarabun font not found, using Helvetica")
+                print("No Thai fonts found, using system fallback")
         except Exception as e:
             font_family = 'Helvetica'
             print(f"Font registration failed: {e}")
         
-        # Create PDF document
-        doc = SimpleDocTemplate(file_name, pagesize=A4, topMargin=1*inch, bottomMargin=1*inch)
+        # Create PDF document with screenplay-specific margins for A4
+        doc = SimpleDocTemplate(
+            file_name, 
+            pagesize=A4, 
+            topMargin=1*inch, 
+            bottomMargin=1*inch,
+            leftMargin=1.5*inch,   # Standard screenplay left margin
+            rightMargin=1*inch
+        )
         story = []
         
-        # Styles with enhanced leading for Thai text
+        # Screenplay formatting styles for A4 paper
         styles = getSampleStyleSheet()
         
-        # Title style
+        # Title page style
         title_style = ParagraphStyle(
-            'CustomTitle',
+            'ScreenplayTitle',
             parent=styles['Title'],
-            fontName=font_family,
-            fontSize=16,
+            fontName='THSarabunNew-Bold',
+            fontSize=18,
             textColor='black',
             alignment=1,  # Center
-            spaceAfter=20,
-            leading=24
+            spaceAfter=18,
+            leading=22,
+            bold=True
         )
         
-        # Character name style
+        # Scene heading style (SLUG LINE)
+        scene_heading_style = ParagraphStyle(
+            'SceneHeading',
+            parent=styles['Normal'],
+            fontName=font_family,
+            fontSize=12,
+            textColor='black',
+            alignment=0,  # Left
+            spaceBefore=12,
+            spaceAfter=0,
+            leading=14,
+            fontWeight='bold'
+        )
+        
+        # Character name style (centered above dialog)
         character_style = ParagraphStyle(
             'Character',
             parent=styles['Normal'],
             fontName=font_family,
             fontSize=12,
             textColor='black',
-            alignment=1,  # Center
+            alignment=0,  # Left aligned but with specific indentation
+            leftIndent=2.2*inch,  # Standard character name position
             spaceBefore=12,
-            spaceAfter=6,
-            leading=18
+            spaceAfter=0,
+            leading=14
         )
         
-        # Dialog style
+        # Parentheticals style
+        parenthetical_style = ParagraphStyle(
+            'Parenthetical',
+            parent=styles['Normal'],
+            fontName=font_family,
+            fontSize=11,
+            textColor='black',
+            alignment=0,
+            leftIndent=1.8*inch,
+            rightIndent=2*inch,
+            spaceBefore=0,
+            spaceAfter=0,
+            leading=13
+        )
+        
+        # Dialog style (indented from both sides)
         dialog_style = ParagraphStyle(
             'Dialog',
             parent=styles['Normal'],
             fontName=font_family,
-            fontSize=11,
+            fontSize=12,
             textColor='black',
             alignment=0,  # Left
-            leftIndent=1*inch,
-            rightIndent=1*inch,
-            spaceBefore=6,
-            spaceAfter=12,
-            leading=20  # Enhanced for Thai text
+            leftIndent=1*inch,    # Dialog indentation
+            rightIndent=1.5*inch, # Right margin for dialog
+            spaceBefore=0,
+            spaceAfter=0,
+            leading=16  # Line spacing for Thai text
         )
         
-        # Action style
+        # Action/Description style (full width)
         action_style = ParagraphStyle(
             'Action',
             parent=styles['Normal'],
             fontName=font_family,
-            fontSize=11,
+            fontSize=12,
             textColor='black',
             alignment=0,  # Left
+            leftIndent=0,
+            rightIndent=0,
             spaceBefore=12,
-            spaceAfter=12,
-            leading=18
+            spaceAfter=0,
+            leading=15
         )
         
-        # Add title
-        story.append(Paragraph("VISUAL NOVEL SCREENPLAY", title_style))
-        story.append(Paragraph(f"Generated: {time.strftime('%B %d, %Y')}", styles['Normal']))
-        story.append(Spacer(1, 20))
+        # Transition style (left aligned for IN transitions, right aligned for OUT transitions)
+        transition_in_style = ParagraphStyle(
+            'TransitionIn',
+            parent=styles['Normal'],
+            fontName=font_family,
+            fontSize=12,
+            textColor='black',
+            alignment=0,  # Left aligned
+            spaceAfter=12,
+            leading=14
+        )
         
-        # Process sequence
+        transition_out_style = ParagraphStyle(
+            'TransitionOut',
+            parent=styles['Normal'],
+            fontName=font_family,
+            fontSize=12,
+            textColor='black',
+            alignment=2,  # Right aligned
+            spaceBefore=12,
+            spaceAfter=6,
+            leading=14
+        )
+        
+        # Add title page
+        story.append(Paragraph(os.path.splitext(os.path.basename(file_name))[0].upper(), title_style))
+        # story.append(Spacer(1, 12))
+        story.append(Paragraph(
+            f"Writed: {time.strftime('%B %d, %Y')}",
+            ParagraphStyle(
+            'WrittenDate',
+            parent=styles['Normal'],
+            fontName=font_family,
+            fontSize=12,
+            leading=14,
+            alignment=2,  # Center
+            spaceAfter=0
+            )
+        ))
+        story.append(Spacer(1, 24))  # Page break space
+        
+        # Process sequence with proper screenplay formatting
         for i, node in enumerate(sequence):
-            # Scene header
-            scene_title = f"SCENE {i+1}: {node.name}"
-            story.append(Paragraph(scene_title, character_style))
-            story.append(Spacer(1, 10))
+            # Handle IN scene transitions first (before scene heading)
+            if hasattr(node, 'node_data') and node.node_data:
+                in_scene = node.node_data.get('in_scene', '')
+                if in_scene and in_scene != "None" and in_scene != "Other":
+                    # Add IN transition before scene heading (left aligned)
+                    if in_scene == "FADE IN":
+                        story.append(Paragraph("FADE IN:", transition_in_style))
+                    elif in_scene in ["CUT IN:", "DISSOLVE IN:", "FADE FROM BLACK:"]:
+                        story.append(Paragraph(in_scene, transition_in_style))
+                    else:
+                        # Custom transition
+                        story.append(Paragraph(f"{in_scene.upper()}:", transition_in_style))
             
-            # Node content
+            # Scene heading (SLUG LINE) - always uppercase
+            if hasattr(node, 'node_data') and node.node_data:
+                scene_type = node.node_data.get('scene_type', 'INT.')
+                scene_name = node.node_data.get('name', node.name)
+                time_desc = node.node_data.get('time_description', '')
+                # Use running scene number (1-based) for scene_sequence
+                sequence_number = i + 1
+
+                # Format scene heading
+                scene_heading = f"({sequence_number}) {scene_type.upper()} {scene_name.upper()}"
+                if time_desc:
+                    scene_heading += f" - {time_desc.upper()}"
+                
+                story.append(Paragraph(scene_heading, scene_heading_style))
+                
+                # Skip background/setting description in PDF format
+                # (Background is excluded from screenplay PDF as requested)
+            else:
+                # Fallback scene heading
+                story.append(Paragraph(f"SCENE {i+1}: {node.name.upper()}", scene_heading_style))
+            
+            # Process scene content
             if hasattr(node, 'node_data') and node.node_data and 'items' in node.node_data:
                 for item in node.node_data['items']:
                     item_type = item.get('type', '')
@@ -537,14 +620,17 @@ class ExportManager:
                         character = item.get('character', '')
                         parentheticals = item.get('parentheticals', '')
                         
-                        # Character name
+                        # Character name (uppercase, specific indentation)
                         if character:
-                            char_text = self.normalize_thai_text(character)
-                            if parentheticals:
-                                char_text += f" ({self.normalize_thai_text(parentheticals)})"
+                            char_text = self.normalize_thai_text(character.upper())
                             story.append(Paragraph(char_text, character_style))
                         
-                        # Dialog
+                        # Parentheticals (if any)
+                        if parentheticals:
+                            paren_text = f"({self.normalize_thai_text(parentheticals)})"
+                            story.append(Paragraph(paren_text, parenthetical_style))
+                        
+                        # Dialog text
                         if text:
                             dialog_text = self.normalize_thai_text(text)
                             story.append(Paragraph(dialog_text, dialog_style))
@@ -554,16 +640,27 @@ class ExportManager:
                             action_text = self.normalize_thai_text(text)
                             story.append(Paragraph(action_text, action_style))
             
+            # Add scene transitions (if specified) - OUT transitions at end of scene
+            if hasattr(node, 'node_data') and node.node_data:
+                out_scene = node.node_data.get('out_scene', '')
+                if out_scene and out_scene != "None" and out_scene != "Other":
+                    if out_scene in ["CUT TO:", "DISSOLVE TO:", "FADE OUT:", "FADE TO BLACK:"]:
+                        story.append(Paragraph(out_scene, transition_out_style))
+                    else:
+                        # Custom OUT transition
+                        story.append(Paragraph(f"{out_scene.upper()}:", transition_out_style))
+            
+            # Add spacing between scenes (except for last scene)
             if i < len(sequence) - 1:
-                story.append(Spacer(1, 20))
+                story.append(Spacer(1, 24))
         
-        # Add end
-        story.append(Spacer(1, 20))
-        story.append(Paragraph("END", character_style))
+        # Final screenplay elements
+        story.append(Spacer(1, 24))
+        story.append(Paragraph("THE END", title_style))
         
         # Build PDF
         doc.build(story)
         
         file_size = os.path.getsize(file_name)
         QMessageBox.information(self.main_window, "Export Successful", 
-            f"PDF screenplay exported successfully with ReportLab!\n\nFile: {os.path.basename(file_name)}\nScenes: {len(sequence)}\nSize: {file_size/1024:.1f} KB\n\nNote: Enhanced Thai text support with improved line spacing")
+            f"Screenplay PDF exported successfully!\n\nFile: {os.path.basename(file_name)}\nScenes: {len(sequence)}\nSize: {file_size/1024:.1f} KB\nFont: {font_family}\nFormat: Standard Screenplay (A4)\n\nNote: Professional screenplay formatting with Thai font support")

@@ -1,0 +1,9 @@
+# Visual Novel Node Editor Requirements
+# Core GUI framework
+PySide6>=6.5.0
+
+# PDF generation (ReportLab only - no WeasyPrint)
+reportlab>=4.0.0
+
+# Additional utilities
+pillow>=10.0.0
