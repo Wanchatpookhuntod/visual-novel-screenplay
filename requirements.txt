@@ -1,17 +1,28 @@
 # Visual Novel Node Editor Requirements
-# Production Dependencies
+# Production Dependencies (Required for running the application)
 
-# Core GUI framework
+# Core GUI framework - Modern cross-platform GUI toolkit
 PySide6>=6.5.0,<7.0.0
 
 # PDF generation (ReportLab only - WeasyPrint removed for clean dependencies)
+# Professional PDF creation with Thai font support
 reportlab>=4.0.0,<5.0.0
 
-# Image processing utilities
+# Image processing utilities - Required for icon and image handling
 pillow>=10.0.0,<11.0.0
+
+# Build Tools (Required only for creating .exe files)
+# PyInstaller for creating standalone executables
+pyinstaller>=5.0.0,<7.0.0
 
 # Development and Testing Dependencies (optional)
 # Uncomment if needed for development:
-# pytest>=7.0.0
-# black>=23.0.0
-# flake8>=6.0.0
+# pytest>=7.0.0          # Testing framework
+# black>=23.0.0           # Code formatter
+# flake8>=6.0.0           # Code linter
+
+# Installation Instructions:
+# 1. Basic installation:     pip install -r requirements.txt
+# 2. Manual installation:    pip install PySide6 reportlab pillow pyinstaller
+# 3. Auto install script:    install.bat (Windows) or ./install.sh (Unix)
+# 4. Build executable:       build_exe.bat (Windows) or ./build_exe.sh (Unix)
