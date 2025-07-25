@@ -47,7 +47,7 @@ class MainWindow(QMainWindow):
 
         # Status bar
         self.status_bar = self.statusBar()
-        self.status_bar.showMessage("Ready - Right-click to create nodes, double-click to edit")
+        self.status_bar.showMessage("Ready - Right-click to show context menu, double-click to edit nodes")
         
         # Update status bar periodically
         self.status_timer = QTimer()
@@ -204,7 +204,7 @@ class MainWindow(QMainWindow):
 <h3>Node Editor Controls</h3>
 <p><b>Mouse Controls:</b></p>
 <ul>
-<li><b>Right Click (empty area):</b> Create new node</li>
+<li><b>Right Click (empty area):</b> Show context menu to create nodes</li>
 <li><b>Double Click (node):</b> Open node form editor</li>
 <li><b>Left Click + Drag (node):</b> Move node</li>
 <li><b>Middle Click + Drag:</b> Pan canvas</li>
@@ -259,7 +259,7 @@ class MainWindow(QMainWindow):
 <li>Bezier curve connections</li>
 </ul>
 
-<p>Right-click to create nodes, double-click to edit, drag to connect!</p>
+<p>Right-click to show context menu, double-click to edit, drag to connect!</p>
         """
         
         QMessageBox.about(self, "About Visual Novel Node Editor", about_text)
@@ -441,24 +441,27 @@ class MainWindow(QMainWindow):
                         return True
                 elif hasattr(event, 'button') and event.button() == Qt.RightButton:
                     if item_at_pos is None:
-                        # Create new node on right click
-                        pos = event.position().toPoint() if hasattr(event, 'position') else event.pos()
-                        scene_pos = self.view.mapToScene(pos)
-                        node = NodeScene(scene_pos.x(), scene_pos.y())
-                        self.scene.addItem(node)
-                        self.node_items.append(node)
+                        # Don't handle right-click here - let views.py handle it with context menu
+                        return False  # Let the event propagate to views.py
                         
-                        # Show status message
-                        self.status_bar.showMessage(f"Created new node '{node.name}'", 3000)
-                        
-                        # Expand scene rect if needed
-                        node_rect = node.sceneBoundingRect()
-                        scene_rect = self.scene.sceneRect()
-                        offset = 40
-                        node_rect = node_rect.adjusted(-offset, -offset, offset, offset)
-                        new_rect = scene_rect.united(node_rect)
-                        self.scene.setSceneRect(new_rect)
-                        return True
+                        # OLD CODE: Create new node on right click (now handled by context menu)
+                        # pos = event.position().toPoint() if hasattr(event, 'position') else event.pos()
+                        # scene_pos = self.view.mapToScene(pos)
+                        # node = NodeScene(scene_pos.x(), scene_pos.y())
+                        # self.scene.addItem(node)
+                        # self.node_items.append(node)
+                        # 
+                        # # Show status message
+                        # self.status_bar.showMessage(f"Created new node '{node.name}'", 3000)
+                        # 
+                        # # Expand scene rect if needed
+                        # node_rect = node.sceneBoundingRect()
+                        # scene_rect = self.scene.sceneRect()
+                        # offset = 40
+                        # node_rect = node_rect.adjusted(-offset, -offset, offset, offset)
+                        # new_rect = scene_rect.united(node_rect)
+                        # self.scene.setSceneRect(new_rect)
+                        # return True
             elif event.type() == QEvent.MouseMove:
                 if self._dragging and self._drag_start is not None and hasattr(event, 'pos'):
                     # Canvas panning with middle mouse
@@ -502,7 +505,7 @@ class MainWindow(QMainWindow):
         self.node_items.append(start_node)
         
         # Show status message
-        self.status_bar.showMessage("Default Start node created - Right-click to add more nodes", 3000)
+        self.status_bar.showMessage("Default Start node created - Right-click to show context menu for more nodes", 3000)
         
         print(f"Created default Start node at position ({start_x}, {start_y})")
 
